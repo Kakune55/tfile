@@ -104,7 +104,7 @@ function renderFileList(files) {
 
 /* 路径导航功能 */
 function updatePathDisplay() {
-    const parts = currentPath.split('/').filter(p => p);
+const parts = currentPath.replace(/\\/g, '/').split('/').filter(p => p);
     let pathHtml = `<span class="path-segment" onclick="navigateTo('')">🏠 Home</span>`;
     
     let accumulated = [];
