@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"html/template"
 	"html"
+	"html/template"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,6 +23,8 @@ var templateFS embed.FS
 
 //go:embed static/*
 var staticFS embed.FS
+
+var ServerPort = "8080"
 
 type FileInfo struct {
 	Name    string `json:"name"`
@@ -50,8 +53,39 @@ func main() {
 	http.HandleFunc("/api/mkdir", handleMkdir(absDir))
 	http.HandleFunc("/api/download/", handleDownload(absDir))
 
-	log.Printf("Serving directory %s on :8080", absDir)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Printf("Serving directory %s on Port %s\n\n", absDir, ServerPort)
+	showIPinfo()
+	log.Fatal(http.ListenAndServe((":" + ServerPort), nil))
+}
+
+func showIPinfo() {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, interf := range interfaces {
+		if interf.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := interf.Addrs()
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, addr := range addrs {
+			// 解析 IP 地址并排除子网掩码长度后缀
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				log.Println(interf.Name, "| Link: http://"+addr.String()+":"+ServerPort)
+				continue
+			}
+			// 排除 fe80 开头的 IPv6 地址
+			if ip.To4() == nil && strings.HasPrefix(ip.String(), "fe80") {
+				continue
+			}
+			log.Println(interf.Name, "| Link: http://"+ip.String()+":"+ServerPort)
+		}
+	}
 }
 
 func handleHome(baseDir string) http.HandlerFunc {
@@ -75,13 +109,13 @@ func handleList(baseDir string) http.HandlerFunc {
 		// 获取请求路径参数
 		reqPath := r.URL.Query().Get("path")
 		targetDir := filepath.Join(baseDir, reqPath)
-		
+
 		// 安全检查
 		if !isSafePath(targetDir, baseDir) {
 			http.Error(w, "Invalid path", http.StatusBadRequest)
 			return
 		}
-		
+
 		entries, err := os.ReadDir(targetDir)
 		if err != nil {
 			http.Error(w, "Unable to read directory", http.StatusInternalServerError)
@@ -144,209 +178,209 @@ func handleMkdir(baseDir string) http.HandlerFunc {
 }
 
 func handleUpload(baseDir string) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodPost {
-            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 
-        // 获取上传路径参数
-        uploadPath := r.FormValue("path")
-        targetDir := filepath.Join(baseDir, uploadPath)
+		// 获取上传路径参数
+		uploadPath := r.FormValue("path")
+		targetDir := filepath.Join(baseDir, uploadPath)
 
-        // 路径验证
-        if !isSafePath(targetDir, baseDir) {
-            http.Error(w, "Invalid upload path", http.StatusBadRequest)
-            return
-        }
+		// 路径验证
+		if !isSafePath(targetDir, baseDir) {
+			http.Error(w, "Invalid upload path", http.StatusBadRequest)
+			return
+		}
 
-        // 创建目录（如果不存在）
-        if err := os.MkdirAll(targetDir, 0755); err != nil {
-            http.Error(w, "Cannot create directory", http.StatusInternalServerError)
-            return
-        }
+		// 创建目录（如果不存在）
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			http.Error(w, "Cannot create directory", http.StatusInternalServerError)
+			return
+		}
 
-        // 解析表单
-        if err := r.ParseMultipartForm(100 << 20); err != nil {
-            http.Error(w, "Error parsing form", http.StatusBadRequest)
-            return
-        }
+		// 解析表单
+		if err := r.ParseMultipartForm(100 << 20); err != nil {
+			http.Error(w, "Error parsing form", http.StatusBadRequest)
+			return
+		}
 
-        files := r.MultipartForm.File["files"]
-        for _, fileHeader := range files {
-            file, err := fileHeader.Open()
-            if err != nil {
-                http.Error(w, "Error retrieving file", http.StatusBadRequest)
-                return
-            }
-            defer file.Close()
+		files := r.MultipartForm.File["files"]
+		for _, fileHeader := range files {
+			file, err := fileHeader.Open()
+			if err != nil {
+				http.Error(w, "Error retrieving file", http.StatusBadRequest)
+				return
+			}
+			defer file.Close()
 
-            // 构建安全路径
-            targetPath := filepath.Join(targetDir, filepath.Base(fileHeader.Filename))
-            if !isSafePath(targetPath, baseDir) {
-                http.Error(w, "Invalid file path", http.StatusBadRequest)
-                return
-            }
+			// 构建安全路径
+			targetPath := filepath.Join(targetDir, filepath.Base(fileHeader.Filename))
+			if !isSafePath(targetPath, baseDir) {
+				http.Error(w, "Invalid file path", http.StatusBadRequest)
+				return
+			}
 
-            // 创建文件
-            dst, err := os.Create(targetPath)
-            if err != nil {
-                http.Error(w, "Error creating file", http.StatusInternalServerError)
-                return
-            }
-            defer dst.Close()
+			// 创建文件
+			dst, err := os.Create(targetPath)
+			if err != nil {
+				http.Error(w, "Error creating file", http.StatusInternalServerError)
+				return
+			}
+			defer dst.Close()
 
-            if _, err := io.Copy(dst, file); err != nil {
-                http.Error(w, "Error saving file", http.StatusInternalServerError)
-                return
-            }
-        }
+			if _, err := io.Copy(dst, file); err != nil {
+				http.Error(w, "Error saving file", http.StatusInternalServerError)
+				return
+			}
+		}
 
-        w.WriteHeader(http.StatusCreated)
-    }
+		w.WriteHeader(http.StatusCreated)
+	}
 }
 
 func handleDownload(baseDir string) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        encodedPath := strings.TrimPrefix(r.URL.Path, "/api/download/")
-        if encodedPath == "" {
-            http.Error(w, "Filename required", http.StatusBadRequest)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		encodedPath := strings.TrimPrefix(r.URL.Path, "/api/download/")
+		if encodedPath == "" {
+			http.Error(w, "Filename required", http.StatusBadRequest)
+			return
+		}
 
-        // 解码路径
-        decodedPath, err := url.PathUnescape(encodedPath)
-        if err != nil {
-            http.Error(w, "Invalid filename", http.StatusBadRequest)
-            return
-        }
+		// 解码路径
+		decodedPath, err := url.PathUnescape(encodedPath)
+		if err != nil {
+			http.Error(w, "Invalid filename", http.StatusBadRequest)
+			return
+		}
 
-        // 构建完整路径
-        targetPath := filepath.Join(baseDir, decodedPath)
-        if !isSafePath(targetPath, baseDir) {
-            http.Error(w, "Invalid path", http.StatusBadRequest)
-            return
-        }
+		// 构建完整路径
+		targetPath := filepath.Join(baseDir, decodedPath)
+		if !isSafePath(targetPath, baseDir) {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
 
-        // 检查文件存在
-        if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-            http.Error(w, "File not found", http.StatusNotFound)
-            return
-        }
+		// 检查文件存在
+		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
 
-        // 设置下载头
-        fileName := filepath.Base(decodedPath)
-        w.Header().Set("Content-Disposition", 
-            fmt.Sprintf("attachment; filename=\"%s\"", html.EscapeString(fileName)))
-        http.ServeFile(w, r, targetPath)
-    }
+		// 设置下载头
+		fileName := filepath.Base(decodedPath)
+		w.Header().Set("Content-Disposition",
+			fmt.Sprintf("attachment; filename=\"%s\"", html.EscapeString(fileName)))
+		http.ServeFile(w, r, targetPath)
+	}
 }
 
 func handleRename(baseDir string) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodPost {
-            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 
-        var data struct {
-            Old string `json:"old"`
-            New string `json:"new"`
-        }
-        if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-            http.Error(w, "Invalid request", http.StatusBadRequest)
-            return
-        }
+		var data struct {
+			Old string `json:"old"`
+			New string `json:"new"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
 
-        // 构建完整路径
-        oldPath := filepath.Join(baseDir, data.Old)
-        newPath := filepath.Join(baseDir, data.New)
+		// 构建完整路径
+		oldPath := filepath.Join(baseDir, data.Old)
+		newPath := filepath.Join(baseDir, data.New)
 
-        // 双重验证
-        if !isSafePath(oldPath, baseDir) || !isSafePath(newPath, baseDir) {
-            http.Error(w, "Invalid path", http.StatusBadRequest)
-            return
-        }
+		// 双重验证
+		if !isSafePath(oldPath, baseDir) || !isSafePath(newPath, baseDir) {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
 
-        // 检查源文件存在
-        if _, err := os.Stat(oldPath); os.IsNotExist(err) {
-            http.Error(w, "Source not found", http.StatusNotFound)
-            return
-        }
+		// 检查源文件存在
+		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+			http.Error(w, "Source not found", http.StatusNotFound)
+			return
+		}
 
-        // 执行重命名
-        if err := os.Rename(oldPath, newPath); err != nil {
-            log.Printf("Rename error: %v", err)
-            http.Error(w, "Rename failed", http.StatusInternalServerError)
-            return
-        }
+		// 执行重命名
+		if err := os.Rename(oldPath, newPath); err != nil {
+			log.Printf("Rename error: %v", err)
+			http.Error(w, "Rename failed", http.StatusInternalServerError)
+			return
+		}
 
-        w.WriteHeader(http.StatusOK)
-    }
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 func handleDelete(baseDir string) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodPost {
-            http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 
-        var data struct {
-            Path string `json:"path"` // 完整相对路径
-        }
-        if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-            http.Error(w, "Invalid request", http.StatusBadRequest)
-            return
-        }
+		var data struct {
+			Path string `json:"path"` // 完整相对路径
+		}
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
 
-        // 构建完整路径
-        targetPath := filepath.Join(baseDir, data.Path)
-        
-        // 安全验证
-        if !isSafePath(targetPath, baseDir) {
-            http.Error(w, "Invalid path", http.StatusBadRequest)
-            return
-        }
+		// 构建完整路径
+		targetPath := filepath.Join(baseDir, data.Path)
 
-        // 检查存在性
-        if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-            http.Error(w, "Not found", http.StatusNotFound)
-            return
-        }
+		// 安全验证
+		if !isSafePath(targetPath, baseDir) {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
 
-        // 执行删除
-        if err := os.RemoveAll(targetPath); err != nil {
-            log.Printf("Delete error: %v", err)
-            http.Error(w, "Delete failed", http.StatusInternalServerError)
-            return
-        }
+		// 检查存在性
+		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
 
-        w.WriteHeader(http.StatusOK)
-    }
+		// 执行删除
+		if err := os.RemoveAll(targetPath); err != nil {
+			log.Printf("Delete error: %v", err)
+			http.Error(w, "Delete failed", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 func isSafePath(target, baseDir string) bool {
-    // 获取相对路径
-    rel, err := filepath.Rel(baseDir, target)
-    if err != nil {
-        return false
-    }
-    
-    // 防止路径穿越
-    if strings.Contains(rel, "..") {
-        return false
-    }
-    
-    // 标准化路径比较
-    absTarget, err := filepath.Abs(target)
-    if err != nil {
-        return false
-    }
-    absBase, err := filepath.Abs(baseDir)
-    if err != nil {
-        return false
-    }
-    
-    return strings.HasPrefix(absTarget, absBase)
+	// 获取相对路径
+	rel, err := filepath.Rel(baseDir, target)
+	if err != nil {
+		return false
+	}
+
+	// 防止路径穿越
+	if strings.Contains(rel, "..") {
+		return false
+	}
+
+	// 标准化路径比较
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return false
+	}
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return false
+	}
+
+	return strings.HasPrefix(absTarget, absBase)
 }
