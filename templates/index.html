@@ -11,6 +11,7 @@
         <header>
             <h1>📁 File Manager</h1>
             <div class="path-nav">
+                <button class="btn btn-primary" id="refreshButton" onclick="loadFiles(currentPath);showInfo('Done!')">🔄 Refresh</button>
                 <button class="btn btn-secondary" id="upButton" onclick="goUp()" disabled>↑ Up</button>
                 <div class="breadcrumbs" id="pathDisplay"></div>
             </div>
@@ -22,7 +23,11 @@
                 <button class="btn btn-primary" onclick="createFolder()">📂 New Folder</button>
                 <input type="file" id="fileInput" multiple class="form-input">
                 <button class="btn btn-primary" onclick="startUpload()">📤 Upload Files</button>
+            </div>
                 <div id="uploadProgress" class="upload-progress-container"></div>
+                <div id="uploadProgress" class="upload-progress-container"></div>
+            </div>
+            <div id="uploadProgress" class="upload-progress-container"></div>
             </div>
         </div>
 

@@ -269,10 +269,13 @@ func handleDownload(baseDir string) http.HandlerFunc {
 		}
 
 		// 设置下载头
-		fileName := filepath.Base(decodedPath)
-		w.Header().Set("Content-Disposition",
-			fmt.Sprintf("attachment; filename=\"%s\"", html.EscapeString(fileName)))
-		http.ServeFile(w, r, targetPath)
+        fileName := filepath.Base(decodedPath)
+        escapedFilename := url.QueryEscape(fileName) // 用于 filename*
+        w.Header().Set("Content-Disposition",
+            fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s",
+                html.EscapeString(fileName), // 保留原有兼容性
+                escapedFilename))
+        http.ServeFile(w, r, targetPath)
 	}
 }
 

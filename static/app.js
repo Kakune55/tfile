@@ -72,19 +72,14 @@ function renderFileList(files) {
                 <td>
                     ${file.isDir ? 
                         `<span class="dir-link" onclick="navigateTo('${encodeURIComponent(file.path)}')">
-                            📁 ${escapeHtml(file.name)}
+                            📁 <a title='${escapeHtml(file.name)}'>${escapeHtml(file.name).slice(0,25)}</a>
                         </span>` : 
-                        `📄 ${escapeHtml(file.name)}`}
+                        `📄 <a title='${escapeHtml(file.name)}'>${escapeHtml(file.name).slice(0,25)}</a>`}
                 </td>
                 <td>${file.isDir ? '-' : formatSize(file.size)}</td>
                 <td>${new Date(file.modTime).toLocaleString()}</td>
                 <td>
                     <div class="action-buttons">
-                        ${!file.isDir ? 
-                            `<button class="btn btn-primary" 
-                                     onclick="downloadFile('${encodeURIComponent(file.path)}')">
-                                ⬇️ Download
-                            </button>` : ''}
                         <button class="btn btn-secondary" 
                                 onclick="promptRename('${encodeURIComponent(file.path)}')">
                             ✏️ Rename
@@ -93,6 +88,11 @@ function renderFileList(files) {
                                 onclick="confirmDelete('${encodeURIComponent(file.path)}')">
                             🗑️ Delete
                         </button>
+                        ${!file.isDir ? 
+                            `<button class="btn btn-primary" 
+                                     onclick="downloadFile('${encodeURIComponent(file.path)}')">
+                                ⬇️ Download
+                            </button>` : ''}
                     </div>
                 </td>
             </tr>`;
@@ -233,6 +233,9 @@ function uploadFile(uploadId, file) {
                 });
                 //上传成功后刷新列表
                 loadFiles(currentPath);
+                showInfo(`File uploaded successfully: ${file.name}`);
+
+                // 2秒后删除进度条 已被刷新清楚 暂时保留
                 setTimeout(() => cleanupUpload(uploadId), 2000);
             } else {
                 updateProgress(uploadId, { 
@@ -435,7 +438,16 @@ function showError(message) {
     setTimeout(() => errorToast.remove(), 3000);
 }
 
+function showInfo(message) {
+    const infoToast = document.createElement('div');
+    infoToast.className = 'info-toast';
+    infoToast.textContent = message;
+    
+    document.body.appendChild(infoToast);
+    setTimeout(() => infoToast.remove(), 3000);
+}
+
 function showSelectedFiles() {
     const input = document.getElementById('fileInput');
-    // 可以在这里添加选中文件的预览功能
+    // 未来在这里添加选中文件的预览功能
 }
