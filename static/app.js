@@ -318,11 +318,13 @@ async function createFolder() {
 
 function downloadFile(filePath) {
     try {
-        const encodedPath = encodeURIComponent(encodeURIComponent(filePath));
+        const encodedPath = encodeURIComponent(filePath);
         const link = document.createElement('a');
         link.href = `/api/download/${encodedPath}`;
         link.style.display = 'none';
-        link.download = decodeURIComponent(filePath).split('/').pop();
+        
+        // 直接从原文件名获取（无需额外解码）
+        link.download = filePath.split('/').pop();
         
         document.body.appendChild(link);
         link.click();
