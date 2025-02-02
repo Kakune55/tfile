@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html lang="zh">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>tFile Manager</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
             <h1>📁 File Manager</h1>
             <div class="path-nav">
-                <button class="btn btn-primary" id="refreshButton" onclick="loadFiles(currentPath);showInfo('Done!')">🔄 Refresh</button>
+                <button class="btn btn-primary" id="refreshButton" onclick="loadFiles(currentPath);showInfo('Done!')">🔄
+                    Refresh</button>
                 <button class="btn btn-secondary" id="upButton" onclick="goUp()" disabled>↑ Up</button>
                 <div class="breadcrumbs" id="pathDisplay"></div>
             </div>
@@ -24,16 +27,12 @@
                 <input type="file" id="fileInput" multiple class="form-input">
                 <button class="btn btn-primary" onclick="startUpload()">📤 Upload Files</button>
             </div>
-                <div id="uploadProgress" class="upload-progress-container"></div>
-                <div id="uploadProgress" class="upload-progress-container"></div>
-            </div>
             <div id="uploadProgress" class="upload-progress-container"></div>
-            </div>
         </div>
-
         <div id="fileList" class="file-list"></div>
     </div>
 
     <script src="/static/app.js"></script>
 </body>
+
 </html>
