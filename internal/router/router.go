@@ -20,6 +20,7 @@ func NewRouter(baseDir string) http.Handler {
 	mux.HandleFunc("/api/delete", handler.HandleDelete(baseDir))
 	mux.HandleFunc("/api/mkdir", handler.HandleMkdir(baseDir))
 	mux.HandleFunc("/api/download/", handler.HandleDownload(baseDir))
+	mux.HandleFunc("/api/getIndex", handler.HandlerGetIndex(baseDir))
 
 	return mux
 }
