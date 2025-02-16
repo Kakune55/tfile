@@ -67,28 +67,38 @@ func HandlerGetIndex(baseDir string) http.HandlerFunc {
 
 // 扫描所有目录并生成索引
 func generateIndex(directory string) ([]model.FileInfo, error) {
-	var index []model.FileInfo
-	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		path = filepath.ToSlash(path)
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			index = append(index, model.FileInfo{
-				Name: info.Name(),
-				IsDir: info.IsDir(),
-				Size: info.Size(),
-				ModTime: info.ModTime().Format(time.RFC3339),
-				Path: path,
-			})
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return index, nil
+    var index []model.FileInfo
+    // 确保基础目录使用标准格式
+    directory = filepath.ToSlash(directory)
+    
+    err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        // 转换为标准格式
+        path = filepath.ToSlash(path)
+        
+        // 计算相对路径
+        relPath, err := filepath.Rel(directory, path)
+        if err != nil {
+            return err
+        }
+        
+        if !info.IsDir() {
+            index = append(index, model.FileInfo{
+                Name:    info.Name(),
+                IsDir:   info.IsDir(),
+                Size:    info.Size(),
+                ModTime: info.ModTime().Format(time.RFC3339),
+                Path:    relPath, // 使用相对路径
+            })
+        }
+        return nil
+    })
+    
+    if err != nil {
+        return nil, err
+    }
+    return index, nil
 }

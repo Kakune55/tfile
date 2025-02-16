@@ -21,6 +21,10 @@
         </header>
 
         <div class="toolbar">
+            <div class="search-section">
+                <input type="text" id="searchInput" placeholder="Search..." class="form-input" oninput="searchFiles()">
+                <button class="btn btn-primary" onclick="searchFiles(update=true)">🔍 Search</button>     
+            </div>
             <div class="upload-section">
                 <input type="text" id="newFolderName" placeholder="New folder name" class="form-input">
                 <button class="btn btn-primary" onclick="createFolder()">📂 New Folder</button>

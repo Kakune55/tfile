@@ -74,6 +74,13 @@ h1 {
     align-items: center;
 }
 
+.search-section {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
 /* File List */
 .file-list table {
     width: 100%;

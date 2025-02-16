@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // 全局状态
 let currentPath = '';
 const uploads = new Map(); // 用于跟踪上传任务
+var searchIndex = [];
 
 /* 初始化应用 */
 function initializeApp() {
@@ -13,10 +14,10 @@ function initializeApp() {
     const urlParams = new URLSearchParams(window.location.search);
     const initialPath = urlParams.get('path') || '';
     currentPath = normalizePath(initialPath);
-    
+
     // 初始加载文件
     loadFiles(currentPath);
-    
+
     // 注册全局事件
     registerGlobalEvents();
 }
@@ -37,12 +38,12 @@ async function loadFiles(path) {
     try {
         currentPath = normalizePath(path);
         updateBrowserURL();
-        
+
         const query = currentPath ? `?path=${encodeURIComponent(currentPath)}` : '';
         const response = await fetch(`/api/list${query}`);
-        
+
         if (!response.ok) throw new Error('Failed to load files');
-        
+
         const files = await response.json();
         renderFileList(files);
         updatePathDisplay();
@@ -65,16 +66,16 @@ function renderFileList(files) {
                 </tr>
             </thead>
             <tbody>`;
-    
+
     files.forEach(file => {
         html += `
             <tr>
                 <td>
-                    ${file.isDir ? 
-                        `<span class="dir-link" onclick="navigateTo('${encodeURIComponent(file.path)}')">
-                            📁 <a title='${escapeHtml(file.name)}'>${escapeHtml(file.name).slice(0,25)}</a>
-                        </span>` : 
-                        `📄 <a title='${escapeHtml(file.name)}'>${escapeHtml(file.name).slice(0,25)}</a>`}
+                    ${file.isDir ?
+                `<span class="dir-link" onclick="navigateTo('${encodeURIComponent(file.path)}')">
+                            📁 <a title='${escapeHtml(file.name)}'>${escapeHtml(file.name).slice(0, 25)}</a>
+                        </span>` :
+                `📄 <a title='${escapeHtml(file.name)}'>${escapeHtml(file.name).slice(0, 25)}</a>`}
                 </td>
                 <td>${file.isDir ? '-' : formatSize(file.size)}</td>
                 <td>${new Date(file.modTime).toLocaleString()}</td>
@@ -88,8 +89,8 @@ function renderFileList(files) {
                                 onclick="confirmDelete('${encodeURIComponent(file.path)}')">
                             🗑️ Delete
                         </button>
-                        ${!file.isDir ? 
-                            `<button class="btn btn-primary" 
+                        ${!file.isDir ?
+                `<button class="btn btn-primary" 
                                      onclick="downloadFile('${encodeURIComponent(file.path)}')">
                                 ⬇️ Download
                             </button>` : ''}
@@ -97,16 +98,16 @@ function renderFileList(files) {
                 </td>
             </tr>`;
     });
-    
+
     html += `</tbody></table>`;
     fileList.innerHTML = html;
 }
 
 /* 路径导航功能 */
 function updatePathDisplay() {
-const parts = currentPath.replace(/\\/g, '/').split('/').filter(p => p);
+    const parts = currentPath.replace(/\\/g, '/').split('/').filter(p => p);
     let pathHtml = `<span class="path-segment" onclick="navigateTo('')">🏠 Home</span>`;
-    
+
     let accumulated = [];
     parts.forEach((part, index) => {
         accumulated.push(part);
@@ -119,7 +120,7 @@ const parts = currentPath.replace(/\\/g, '/').split('/').filter(p => p);
                 ${escapeHtml(part)}
             </span>`;
     });
-    
+
     document.getElementById('pathDisplay').innerHTML = pathHtml;
     document.getElementById('upButton').disabled = currentPath === '';
 }
@@ -142,7 +143,7 @@ function goUp() {
 function startUpload() {
     const input = document.getElementById('fileInput');
     const files = input.files;
-    
+
     if (files.length === 0) {
         showError('Please select files to upload');
         return;
@@ -153,7 +154,7 @@ function startUpload() {
         createProgressItem(uploadId, file);
         uploadFile(uploadId, file);
     });
-    
+
     input.value = ''; // 清空选择
 }
 
@@ -163,7 +164,7 @@ function generateUploadId() {
 
 function createProgressItem(uploadId, file) {
     const container = document.getElementById('uploadProgress');
-    
+
     const item = document.createElement('div');
     item.className = 'upload-item';
     item.id = uploadId;
@@ -181,7 +182,7 @@ function createProgressItem(uploadId, file) {
             <span class="upload-status">Waiting...</span>
         </div>
     `;
-    
+
     container.prepend(item);
 }
 
@@ -194,17 +195,17 @@ function uploadFile(uploadId, file) {
     let startTime = Date.now();
     let lastLoaded = 0;
     let lastTime = startTime;
-    
+
     uploads.set(uploadId, { xhr, startTime, file });
 
     xhr.upload.addEventListener('progress', (e) => {
         if (!e.lengthComputable) return;
-        
+
         const currentTime = Date.now();
         const deltaTime = (currentTime - lastTime) / 1000;
         const deltaLoaded = e.loaded - lastLoaded;
         const speed = deltaLoaded / deltaTime;
-        
+
         updateProgress(uploadId, {
             progress: (e.loaded / e.total) * 100,
             speed: speed,
@@ -217,9 +218,9 @@ function uploadFile(uploadId, file) {
     });
 
     xhr.upload.addEventListener('error', () => {
-        updateProgress(uploadId, { 
-            status: 'Error', 
-            error: 'Network error' 
+        updateProgress(uploadId, {
+            status: 'Error',
+            error: 'Network error'
         });
         cleanupUpload(uploadId);
     });
@@ -227,9 +228,9 @@ function uploadFile(uploadId, file) {
     xhr.onreadystatechange = () => {
         if (xhr.readyState === 4) {
             if (xhr.status === 201) {
-                updateProgress(uploadId, { 
-                    progress: 100, 
-                    status: 'Completed' 
+                updateProgress(uploadId, {
+                    progress: 100,
+                    status: 'Completed'
                 });
                 //上传成功后刷新列表
                 loadFiles(currentPath);
@@ -238,7 +239,7 @@ function uploadFile(uploadId, file) {
                 // 2秒后删除进度条 已被刷新清楚 暂时保留
                 setTimeout(() => cleanupUpload(uploadId), 2000);
             } else {
-                updateProgress(uploadId, { 
+                updateProgress(uploadId, {
                     status: 'Error',
                     error: xhr.statusText || 'Upload failed'
                 });
@@ -258,7 +259,7 @@ function updateProgress(uploadId, data) {
     // 更新进度条
     if (data.progress !== undefined) {
         item.querySelector('.progress-fill').style.width = `${data.progress}%`;
-        item.querySelector('.progress-percent').textContent = 
+        item.querySelector('.progress-percent').textContent =
             `${data.progress.toFixed(1)}%`;
     }
 
@@ -271,9 +272,9 @@ function updateProgress(uploadId, data) {
     if (data.status) {
         const statusElement = item.querySelector('.upload-status');
         statusElement.textContent = data.status;
-        statusElement.style.color = 
-            data.status === 'Completed' ? '#28a745' : 
-            data.status === 'Error' ? '#dc3545' : '#666';
+        statusElement.style.color =
+            data.status === 'Completed' ? '#28a745' :
+                data.status === 'Error' ? '#dc3545' : '#666';
     }
 
     if (data.error) showError(data.error);
@@ -311,7 +312,7 @@ async function createFolder() {
         });
 
         if (!response.ok) throw new Error('Failed to create folder');
-        
+
         document.getElementById('newFolderName').value = '';
         loadFiles(currentPath);
     } catch (error) {
@@ -321,14 +322,14 @@ async function createFolder() {
 
 function downloadFile(filePath) {
     try {
-        const encodedPath = encodeURIComponent(filePath);
+        const encodedPath = decodeURIComponent(filePath);
         const link = document.createElement('a');
         link.href = `/api/download/${encodedPath}`;
         link.style.display = 'none';
-        
+
         // 直接从原文件名获取（无需额外解码）
         link.download = filePath.split('/').pop();
-        
+
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -342,12 +343,12 @@ function promptRename(oldPath) {
     const decodedPath = decodeURIComponent(oldPath);
     const oldName = decodedPath.split('/').pop();
     const newName = prompt('Enter new name:', oldName);
-    
+
     if (!newName || newName === oldName) return;
 
     const newPath = filepathJoin(
-        currentPath, 
-        decodedPath.split('/').slice(0, -1).join('/'), 
+        currentPath,
+        decodedPath.split('/').slice(0, -1).join('/'),
         newName
     );
 
@@ -372,9 +373,9 @@ async function performRename(oldPath, newPath) {
 function confirmDelete(filePath) {
     const decodedPath = decodeURIComponent(filePath);
     const fileName = decodedPath.split('/').pop();
-    
+
     if (!confirm(`Delete "${fileName}" permanently?`)) return;
-    
+
     performDelete(decodedPath);
 }
 
@@ -424,7 +425,7 @@ function filepathJoin(...parts) {
 }
 
 function updateBrowserURL() {
-    const newUrl = window.location.pathname + 
+    const newUrl = window.location.pathname +
         (currentPath ? `?path=${encodeURIComponent(currentPath)}` : '');
     window.history.replaceState({}, '', newUrl);
 }
@@ -433,7 +434,7 @@ function showError(message) {
     const errorToast = document.createElement('div');
     errorToast.className = 'error-toast';
     errorToast.textContent = message;
-    
+
     document.body.appendChild(errorToast);
     setTimeout(() => errorToast.remove(), 3000);
 }
@@ -442,7 +443,7 @@ function showInfo(message) {
     const infoToast = document.createElement('div');
     infoToast.className = 'info-toast';
     infoToast.textContent = message;
-    
+
     document.body.appendChild(infoToast);
     setTimeout(() => infoToast.remove(), 3000);
 }
@@ -450,4 +451,63 @@ function showInfo(message) {
 function showSelectedFiles() {
     const input = document.getElementById('fileInput');
     // 未来在这里添加选中文件的预览功能
+}
+
+function searchFiles(update = false) {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) return;
+    if (searchIndex.length == 0) {
+        loadSearchIndex();
+        showInfo('Search index initialized.');
+    } else {
+        if (update) {
+            loadSearchIndex();
+        }
+    }
+    showSearchResults(query);
+}
+
+
+function loadSearchIndex() {
+    fetch('/api/getIndex')
+        .then(response => response.json())
+        .then(data => {
+            searchIndex = data;
+        })
+        .catch(error => {
+            console.error('Error loading search index:', error);
+        });
+}
+
+function showSearchResults(query) {
+    if (!query || !searchIndex || searchIndex.length === 0) {
+        return;
+    }
+
+    // 将查询转换为小写以进行不区分大小写的搜索
+    const lowerQuery = query.toLowerCase();
+
+    // 使用模糊匹配搜索文件
+    const matchedFiles = searchIndex.filter(file => {
+        const fileName = file.name.toLowerCase();
+        const filePath = file.path.toLowerCase();
+        return fileName.includes(lowerQuery) || filePath.includes(lowerQuery);
+    });
+
+    if (matchedFiles.length === 0) {
+        showInfo('No matching files found');
+        return;
+    }
+
+    // 使用现有的renderFileList函数来显示搜索结果
+    renderFileList(matchedFiles);
+
+    // 更新路径显示，表明这是搜索结果
+    const pathDisplay = document.getElementById('pathDisplay');
+    pathDisplay.innerHTML = `
+        <span class="path-segment" onclick="navigateTo('')">🏠 Home</span>
+        <span class="path-separator">/</span>
+        <span class="path-segment">
+            🔍 Search results for: "${escapeHtml(query)}" (${matchedFiles.length} files)
+        </span>`;
 }
